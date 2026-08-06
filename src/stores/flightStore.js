@@ -3,9 +3,6 @@ import { ref } from "vue";
 
 export const useFlightStore = defineStore("flight", () => {
 
-const flights = ref(
-    loadFlights()
-);
 
     const defaultFlights = [
         {
@@ -125,6 +122,10 @@ const flights = ref(
 		    ]
         }
     ];
+
+    const flights = ref(
+    loadFlights()
+);
 
     function loadFlights() {
         const savedFlights = localStorage.getItem("flights");
