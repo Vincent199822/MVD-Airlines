@@ -29,6 +29,14 @@ const success = store.login(
 
 </script>
 
+<!-- LOGIN ACCOUNT
+	
+	REGULAR USER
+		userName: test@mail.com
+		password: test1234
+
+ -->
+
 <template>
 <div class="container py-5">
     <div class="row justify-content-center">
