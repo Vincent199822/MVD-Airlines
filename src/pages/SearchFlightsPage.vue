@@ -1,10 +1,10 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useFlightStore } from "../stores/flightStore";
 
 const flightStore = useFlightStore();
 
-const flights = ref(flightStore.flights);
+const flights = ref([]);
 
 const filters = ref({
     from: "",
@@ -12,22 +12,41 @@ const filters = ref({
     departure: ""
 });
 
-function searchFlights(){
+const origins = computed(() => {
+    return [...new Set(
+        flightStore.flights.map(flight => flight.origin)
+    )];
+});
 
+const destinations = computed(() => {
+    return [...new Set(
+        flightStore.flights.map(flight => flight.destination)
+    )];
+});
+
+
+onMounted(async () => {
+    const result = await flightStore.fetchFlights();
+
+    if (result.success) {
+        flights.value = flightStore.flights;
+    } else {
+        alert(result.message);
+    }
+});
+
+function searchFlights() {
     flights.value = flightStore.searchFlights(filters.value);
-
 }
 
-function resetSearch(){
-
+function resetSearch() {
     filters.value = {
-        from:"",
-        to:"",
-        departure:""
-    }
+        from: "",
+        to: "",
+        departure: ""
+    };
 
     flights.value = flightStore.flights;
-
 }
 </script>
 
@@ -35,149 +54,204 @@ function resetSearch(){
 
 <div class="container">
 
-    <h2 class="mb-4">
-        Search Flights
-    </h2>
 
-    <div class="card shadow p-4 mb-4">
+<h2 class="mb-4">
+    Search Flights
+</h2>
 
-        <div class="row">
-
-            <div class="col-md-4 mb-3">
-
-                <label class="form-label">
-                    From
-                </label>
-
-                <select
-                    class="form-select"
-                    v-model="filters.from"
-                >
-                    <option value="">Any</option>
-                    <option>Manila</option>
-                </select>
-
-            </div>
-
-            <div class="col-md-4 mb-3">
-
-                <label class="form-label">
-                    To
-                </label>
-
-                <select
-                    class="form-select"
-                    v-model="filters.to"
-                >
-                    <option value="">Any</option>
-                    <option>Tokyo</option>
-                    <option>Singapore</option>
-                    <option>Seoul</option>
-                </select>
-
-            </div>
-
-            <div class="col-md-4 mb-3">
-
-                <label class="form-label">
-                    Departure
-                </label>
-
-                <input
-                    type="date"
-                    class="form-control"
-                    v-model="filters.departure"
-                >
-
-            </div>
-
-        </div>
-
-        <div>
-
-            <button
-                class="btn btn-primary me-2"
-                @click="searchFlights"
-            >
-                Search
-            </button>
-
-            <button
-                class="btn btn-secondary"
-                @click="resetSearch"
-            >
-                Reset
-            </button>
-
-        </div>
-
-    </div>
+<!-- Search Filters -->
+<div class="card shadow p-4 mb-4">
 
     <div class="row">
 
-        <div
-            class="col-md-6 mb-4"
-            v-for="flight in flights"
-            :key="flight.id"
+        <!-- From -->
+        <div class="col-md-4 mb-3">
+
+            <label class="form-label">
+                From
+            </label>
+
+            <select
+                class="form-select"
+                v-model="filters.from"
+            >
+                <option value="">Any</option>
+
+                <option
+                    v-for="origin in origins"
+                    :key="origin"
+                    :value="origin"
+                >
+                    {{ origin }}
+                </option>
+            </select>
+        </div>
+
+        <!-- To -->
+        <div class="col-md-4 mb-3">
+
+            <label class="form-label">
+                To
+            </label>
+
+            <select
+                class="form-select"
+                v-model="filters.to"
+            >
+                <option value="">Any</option>
+
+                <option
+                    v-for="destination in destinations"
+                    :key="destination"
+                    :value="destination"
+                >
+                    {{ destination }}
+                </option>
+            </select>
+
+        </div>
+
+        <!-- Departure -->
+        <div class="col-md-4 mb-3">
+
+            <label class="form-label">
+                Departure
+            </label>
+
+            <input
+                type="date"
+                class="form-control"
+                v-model="filters.departure"
+            >
+
+        </div>
+
+    </div>
+
+    <!-- Buttons -->
+    <div>
+
+        <button
+            class="btn btn-primary me-2"
+            @click="searchFlights"
         >
+            Search
+        </button>
 
-            <div class="card shadow h-100">
+        <button
+            class="btn btn-secondary"
+            @click="resetSearch"
+        >
+            Reset
+        </button>
 
-                <div class="card-body">
+    </div>
 
-                    <h4>
-                        ✈ {{ flight.airline }}
-                    </h4>
+</div>
 
-                    <p>
-                        <strong>{{ flight.from }}</strong>
-                        →
-                        <strong>{{ flight.to }}</strong>
-                    </p>
 
-                    <p>
+<!-- Flight Results -->
+<div class="row">
 
-                        Flight Number:
-                        {{ flight.flightNumber }}
+    <!-- No flights -->
+    <div
+        v-if="flights.length === 0"
+        class="col-12"
+    >
+        <div class="alert alert-info">
+            No flights found.
+        </div>
+    </div>
 
-                    </p>
 
-                    <p>
+    <!-- Flights -->
+    <div
+        v-for="flight in flights"
+        :key="flight._id"
+        class="col-md-6 mb-4"
+    >
 
-                        Departure:
-                        {{ flight.departure }}
+        <div class="card shadow h-100">
 
-                    </p>
+            <div class="card-body">
 
-                    <p>
+                <!-- Flight Number -->
+                <h4>
+                    ✈ {{ flight.flightNumber }}
+                </h4>
 
-                        Time:
-                        {{ flight.departureTime }}
 
-                    </p>
+                <!-- Route -->
+                <p>
+                    <strong>{{ flight.origin }}</strong>
+                    →
+                    <strong>{{ flight.destination }}</strong>
+                </p>
 
-                    <p>
 
-                        Price:
+                <!-- Departure -->
+                <p>
+                    <strong>Departure:</strong>
+                    {{ new Date(flight.departureDate).toLocaleString() }}
+                </p>
 
-                        ₱{{ flight.price.toLocaleString() }}
 
-                    </p>
+                <!-- Arrival -->
+                <p>
+                    <strong>Arrival:</strong>
+                    {{ new Date(flight.arrivalDate).toLocaleString() }}
+                </p>
 
-                    <router-link
-                        class="btn btn-primary"
-                        :to="'/flight/' + flight.id"
+
+                <!-- Price -->
+                <p>
+                    <strong>Price:</strong>
+                    ₱{{ flight.price.toLocaleString() }}
+                </p>
+
+
+                <!-- Available Seats -->
+                <p>
+                    <strong>Available Seats:</strong>
+                    {{ flight.availableSeats }}
+                </p>
+
+
+                <!-- Status -->
+                <p>
+                    <strong>Status:</strong>
+
+                    <span
+                        class="badge"
+                        :class="{
+                            'bg-success': flight.status === 'scheduled',
+                            'bg-warning text-dark': flight.status === 'boarding',
+                            'bg-secondary': flight.status === 'departed',
+                            'bg-primary': flight.status === 'arrived',
+                            'bg-danger': flight.status === 'cancelled'
+                        }"
                     >
-                        View Details
-                    </router-link>
+                        {{ flight.status }}
+                    </span>
+                </p>
 
-                </div>
+
+                <!-- View Details -->
+                <router-link
+                    class="btn btn-primary"
+                    :to="'/flight/' + flight._id"
+                >
+                    View Details
+                </router-link>
 
             </div>
 
         </div>
 
     </div>
+
+</div>
+
 
 </div>
 

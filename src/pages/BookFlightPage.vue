@@ -1,119 +1,338 @@
 <script setup>
-import { computed, ref } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
+import { useBookingStore } from "../stores/bookingStore";
 import { useFlightStore } from "../stores/flightStore";
 import { useUserStore } from "../stores/user";
-
-import { useBookingStore } from "../stores/bookingStore";
-
-const selectedSeat = ref("");
-const selectedMeal = ref("Standard");
-const bookingStore = useBookingStore();
+import api from "../api/axios";
 
 const route = useRoute();
 const router = useRouter();
 
+const bookingStore = useBookingStore();
 const flightStore = useFlightStore();
 const userStore = useUserStore();
 
-const flight = computed(() => {
-    return flightStore.getFlightById(route.params.id);
-});
+
+// ========================================
+// FLIGHT
+// ========================================
+
+const flight = ref(null);
+const errorMessage = ref("");
+
+
+// ========================================
+// SEAT
+// ========================================
+
+const selectedSeat = ref("");
+
+
+// ========================================
+// MEALS
+// ========================================
+
+const selectedMeals = ref([]);
+const meals = ref([]);
+
+
+// ========================================
+// ADD-ONS
+// ========================================
+
+const selectedAddOns = ref([]);
+const addOns = ref([]);
+
+
+// ========================================
+// TAX
+// ========================================
+
+const tax = 750;
+
+
+// ========================================
+// PASSENGER
+// ========================================
 
 const passenger = computed(() => {
-    return userStore.currentUser;
+    return userStore.currentUser || {};
 });
 
-const tax = computed(() => 750);
+
+// ========================================
+// FLIGHT PRICE
+// ========================================
+
+const flightPrice = computed(() => {
+    return flight.value?.price || 0;
+});
+
+
+// ========================================
+// MEALS TOTAL
+// ========================================
+
+const mealsTotal = computed(() => {
+
+    return selectedMeals.value.reduce(
+        (total, selectedName) => {
+
+            const meal = meals.value.find(
+                item => item.name === selectedName
+            );
+
+            return total + (meal ? meal.price : 0);
+
+        },
+        0
+    );
+
+});
+
+
+// ========================================
+// ADD-ONS TOTAL
+// ========================================
+
+const addOnsTotal = computed(() => {
+
+    return selectedAddOns.value.reduce(
+        (total, selectedName) => {
+
+            const addOn = addOns.value.find(
+                item => item.name === selectedName
+            );
+
+            return total + (addOn ? addOn.price : 0);
+
+        },
+        0
+    );
+
+});
+
+// ========================================
+// LOAD MEALS
+// ========================================
+
+async function fetchMeals() {
+
+    try {
+
+        const response = await api.get("/meals");
+
+        meals.value = response.data.meals.filter(
+            meal => meal.status === "active"
+        );
+
+    } catch (error) {
+
+        console.error("Get meals error:", error);
+
+    }
+
+}
+
+
+// ========================================
+// LOAD ADD-ONS
+// ========================================
+
+async function fetchAddOns() {
+
+    try {
+
+        const response = await api.get("/addons");
+
+        addOns.value = response.data.addOns.filter(
+            addOn => addOn.status === "active"
+        );
+
+    } catch (error) {
+
+        console.error("Get add-ons error:", error);
+
+    }
+
+}
+
+
+// ========================================
+// TOTAL PRICE
+// ========================================
 
 const totalPrice = computed(() => {
-    return flight.value.price + tax.value;
+
+    return (
+        flightPrice.value +
+        mealsTotal.value +
+        addOnsTotal.value +
+        tax
+    );
+
 });
 
-function goBack() {
-    router.back();
-}
+
+// ========================================
+// SELECT SEAT
+// ========================================
 
 function selectSeat(seat) {
-    if (flight.value.reservedSeats.includes(seat)) {
+
+    if (
+        flight.value?.reservedSeats?.includes(seat)
+    ) {
         return;
     }
+
     selectedSeat.value = seat;
+
 }
-// Comfirm Booking
-function confirmBooking() {
-    if (!selectedSeat.value) {
-        alert("Please select a seat.");
-        return;
+
+
+// ========================================
+// GO BACK
+// ========================================
+
+function goBack() {
+
+    router.back();
+
+}
+
+
+// ========================================
+// LOAD FLIGHT
+// ========================================
+
+onMounted(async () => {
+
+    errorMessage.value = "";
+
+    const result = await flightStore.getFlightById(
+        route.params.id
+    );
+
+    if (result.success) {
+
+        flight.value = result.flight;
+
+    } else {
+
+        errorMessage.value =
+            result.message || "Unable to load flight.";
+
     }
 
-        flightStore.reserveSeat(
-		    flight.value.id,
-		    selectedSeat.value
-		);
+    await fetchMeals();
+    await fetchAddOns();
 
-    bookingStore.bookFlight({
-
-        id: Date.now(),
-
-        passengerName:
-            passenger.value.firstName +
-            " " +
-            passenger.value.lastName,
-        email: passenger.value.email,
-        mobileNo: passenger.value.mobileNo,
-        flightId: flight.value.id,
-        airline: flight.value.airline,
-
-        flightNumber: flight.value.flightNumber,
-        from: flight.value.from,
-        to: flight.value.to,
-        departure: flight.value.departure,
-        departureTime: flight.value.departureTime,
-
-        arrivalTime: flight.value.arrivalTime,
-        seat: selectedSeat.value,
-        meal: selectedMeal.value,
-        price: flight.value.price,
-
-        tax: tax.value,
-        total: totalPrice.value,
-
-        bookedAt: new Date().toLocaleString(),
-
-        status: "Confirmed"
-
-    });
+});
 
 
+// ========================================
+// CONFIRM BOOKING
+// ========================================
 
-    alert("Flight booked successfully!");
-    router.push("/booking-history");
-}
+const confirmBooking = async () => {
 
+    // Check flight
+    if (!flight.value) {
+
+        alert("Flight information is unavailable.");
+
+        return;
+
+    }
+
+
+    // Check seat
+    if (!selectedSeat.value) {
+
+        alert("Please select a seat.");
+
+        return;
+
+    }
+
+
+    // Check meal
+    if (selectedMeals.value.length === 0) {
+
+        alert("Please select at least one meal.");
+
+        return;
+
+    }
+
+
+    // Create booking
+    const result = await bookingStore.createBooking(
+        flight.value._id,
+        1,
+        selectedSeat.value,
+        selectedMeals.value,
+        selectedAddOns.value
+    );
+
+
+    if (result.success) {
+
+        alert("Booking created successfully!");
+
+        router.push("/booking-history");
+
+    } else {
+
+        alert(
+            result.message ||
+            "Failed to create booking."
+        );
+
+    }
+
+};
 
 </script>
 
+
 <template>
+
 <div class="container py-4">
+
+
+    <!-- ========================================
+         BOOKING CARD
+    ======================================== -->
 
     <div
         v-if="flight"
         class="card shadow-lg"
     >
 
+
+        <!-- ========================================
+             HEADER
+        ======================================== -->
+
         <div class="card-header bg-success text-white">
 
-            <h2>
+            <h2 class="mb-0">
                 ✈ Book Flight
             </h2>
 
         </div>
 
+
         <div class="card-body">
 
-            <!-- Flight Information -->
+
+            <!-- ========================================
+                 FLIGHT INFORMATION
+            ======================================== -->
 
             <h4 class="mb-3">
                 Flight Information
@@ -121,51 +340,89 @@ function confirmBooking() {
 
             <hr>
 
+
             <div class="row">
+
+
+                <!-- LEFT -->
 
                 <div class="col-md-6">
 
                     <p>
-                        <strong>Airline:</strong>
-                        {{ flight.airline }}
-                    </p>
+                        <strong>
+                            Flight Number:
+                        </strong>
 
-                    <p>
-                        <strong>Flight Number:</strong>
                         {{ flight.flightNumber }}
                     </p>
 
-                    <p>
-                        <strong>Route:</strong>
-                        {{ flight.from }} → {{ flight.to }}
-                    </p>
 
                     <p>
-                        <strong>Date:</strong>
-                        {{ flight.departure }}
+                        <strong>
+                            Route:
+                        </strong>
+
+                        {{ flight.origin }}
+                        →
+                        {{ flight.destination }}
+                    </p>
+
+
+                    <p>
+                        <strong>
+                            Date:
+                        </strong>
+
+                        {{
+                            new Date(
+                                flight.departureDate
+                            ).toLocaleDateString()
+                        }}
                     </p>
 
                 </div>
 
+
+                <!-- RIGHT -->
+
                 <div class="col-md-6">
 
                     <p>
-                        <strong>Departure:</strong>
-                        {{ flight.departureTime }}
+                        <strong>
+                            Departure:
+                        </strong>
+
+                        {{
+                            new Date(
+                                flight.departureDate
+                            ).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit"
+                            })
+                        }}
                     </p>
 
-                    <p>
-                        <strong>Arrival:</strong>
-                        {{ flight.arrivalTime }}
-                    </p>
 
                     <p>
-                        <strong>Cabin:</strong>
-                        {{ flight.cabin }}
+                        <strong>
+                            Arrival:
+                        </strong>
+
+                        {{
+                            new Date(
+                                flight.arrivalDate
+                            ).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit"
+                            })
+                        }}
                     </p>
 
+
                     <p>
-                        <strong>Price:</strong>
+                        <strong>
+                            Price:
+                        </strong>
 
                         ₱{{ flight.price.toLocaleString() }}
 
@@ -175,7 +432,10 @@ function confirmBooking() {
 
             </div>
 
-            <!-- Passenger Information -->
+
+            <!-- ========================================
+                 PASSENGER INFORMATION
+            ======================================== -->
 
             <h4 class="mt-5 mb-3">
                 Passenger Information
@@ -183,208 +443,568 @@ function confirmBooking() {
 
             <hr>
 
+
             <div class="row">
+
+
+                <!-- LEFT -->
 
                 <div class="col-md-6">
 
                     <p>
-                        <strong>First Name:</strong>
+                        <strong>
+                            First Name:
+                        </strong>
 
                         {{ passenger.firstName }}
-
                     </p>
 
+
                     <p>
-                        <strong>Last Name:</strong>
+                        <strong>
+                            Last Name:
+                        </strong>
 
                         {{ passenger.lastName }}
-
                     </p>
 
                 </div>
 
+
+                <!-- RIGHT -->
+
                 <div class="col-md-6">
 
                     <p>
-                        <strong>Email:</strong>
+                        <strong>
+                            Email:
+                        </strong>
 
                         {{ passenger.email }}
-
                     </p>
 
+
                     <p>
-                        <strong>Mobile:</strong>
+                        <strong>
+                            Mobile:
+                        </strong>
 
                         {{ passenger.mobileNo }}
-
                     </p>
 
                 </div>
 
             </div>
 
+
             <hr class="my-5">
- <!-- Seat selection -->
-			<h4 class="mb-3">
-			    Choose Your Seat
-			</h4>
 
-			<div class="d-flex flex-wrap gap-2 mb-3">
 
-			    <button
-			        v-for="seat in flight.seats"
-			        :key="seat"
-			        class="btn"
+            <!-- ========================================
+                 SEAT SELECTION
+            ======================================== -->
 
-			        :class="{
-			            'btn-success':
-			                !flight.reservedSeats.includes(seat) &&
-			                selectedSeat !== seat,
-			            'btn-primary':
-			                selectedSeat === seat,
-			            'btn-danger':
-			                flight.reservedSeats.includes(seat)
-			        }"
+            <h4 class="mb-3">
+                Choose Your Seat
+            </h4>
 
-			        :disabled="flight.reservedSeats.includes(seat)"
-			        @click="selectSeat(seat)"
-			    >
-			        {{ seat }}
-			    </button>
-			</div>
 
-			<div class="mb-4">
-			    <span class="badge bg-success me-2">
-			        Available
-			    </span>
+            <div class="d-flex flex-wrap gap-2 mb-3">
 
-			    <span class="badge bg-primary me-2">
-			        Selected
-			    </span>
 
-			    <span class="badge bg-danger">
-			        Reserved
-			    </span>
-			</div>
+                <button
+                    v-for="seat in flight.seats"
+                    :key="seat"
+                    class="btn"
 
-			<hr class="my-4">
-<!-- Meal Preference -->
-			<h4 class="mb-3">
-			    Meal Preference
-			</h4>
+                    :class="{
 
-			<div class="form-check">
-			    <input
-			        class="form-check-input"
-			        type="radio"
-			        id="standard"
-			        value="Standard"
-			        v-model="selectedMeal"
-			    >
-			    <label class="form-check-label" for="standard">
-			        Standard
-			    </label>
-			</div>
+                        'btn-success':
+                            !flight.reservedSeats.includes(seat) &&
+                            selectedSeat !== seat,
 
-			<div class="form-check">
-			    <input
-			        class="form-check-input"
-			        type="radio"
-			        id="vegetarian"
-			        value="Vegetarian"
-			        v-model="selectedMeal"
-			    >
-			    <label class="form-check-label" for="vegetarian">
-			        Vegetarian
-			    </label>
-			</div>
+                        'btn-primary':
+                            selectedSeat === seat,
 
-			<div class="form-check">
-			    <input
-			        class="form-check-input"
-			        type="radio"
-			        id="halal"
-			        value="Halal"
-			        v-model="selectedMeal"
-			    >
-			    <label class="form-check-label" for="halal">
-			        Halal
-			    </label>
-			</div>
+                        'btn-danger':
+                            flight.reservedSeats.includes(seat)
 
-			<div class="form-check">
-			    <input
-			        class="form-check-input"
-			        type="radio"
-			        id="vegan"
-			        value="Vegan"
-			        v-model="selectedMeal"
-			    >
-			    <label class="form-check-label" for="vegan">
-			        Vegan
-			    </label>
-			</div>
-<!-- Booking Summary -->
-			<hr class="my-4">
+                    }"
 
-			<div class="card bg-light">
-			    <div class="card-body">
-			        <h4 class="mb-3">
-			            Booking Summary
-			        </h4>
+                    :disabled="
+                        flight.reservedSeats.includes(seat)
+                    "
 
-			        <div class="d-flex justify-content-between">
-			            <span>Flight Price</span>
-			            <strong>₱ {{ flight.price.toLocaleString() }}</strong>
-			        </div>
+                    @click="selectSeat(seat)"
+                >
 
-			        <div class="d-flex justify-content-between">
-			            <span>Taxes</span>
-			            <strong>₱ {{ tax.toLocaleString() }}</strong>
-			        </div>
+                    {{ seat }}
 
-			        <div class="d-flex justify-content-between">
-			            <span>Seat</span>
-			            <strong>
-			                {{ selectedSeat || "Not Selected" }}
-			            </strong>
-			        </div>
+                </button>
 
-			        <div class="d-flex justify-content-between">
-			            <span>Meal</span>
-			            <strong>{{ selectedMeal }}</strong>
-			        </div>
+            </div>
 
-			        <hr>
 
-			        <div class="d-flex justify-content-between">
-			            <h5>Total</h5>
-			            <h5 class="text-success">
-			                ₱ {{ totalPrice.toLocaleString() }}
-			            </h5>
-			        </div>
-			    </div>
-			</div>
-	<!-- Button -->		
-			<hr class="my-4">
+            <!-- SEAT LEGEND -->
 
-			<div class="mt-4 d-flex justify-content-between">
-			    <button
-			        class="btn btn-secondary"
-			        @click="goBack"
-			    >
-			        Back
-			    </button>
+            <div class="mb-4">
 
-			    <button
-			        class="btn btn-success"
-			        @click="confirmBooking"
-			    >
-			        Confirm Booking
-			    </button>
-			</div>
+                <span class="badge bg-success me-2">
+                    Available
+                </span>
+
+                <span class="badge bg-primary me-2">
+                    Selected
+                </span>
+
+                <span class="badge bg-danger">
+                    Reserved
+                </span>
+
+            </div>
+
+
+            <hr class="my-4">
+
+
+            <!-- ========================================
+                 MEALS
+            ======================================== -->
+
+            <div class="mb-4">
+
+
+                <h4 class="mb-3">
+                    Select Your Meals
+                </h4>
+
+
+                <p class="text-muted">
+                    You can select multiple meals.
+                </p>
+
+
+                <div class="row g-3">
+
+
+                    <div
+                        v-for="meal in meals"
+                        :key="meal.name"
+                        class="col-md-6"
+                    >
+
+                        <div class="card h-100">
+
+                            <div class="card-body">
+
+                                <div class="form-check">
+
+
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        :id="`meal-${meal.name}`"
+                                        :value="meal.name"
+                                        v-model="selectedMeals"
+                                    >
+
+
+                                    <label
+                                        class="form-check-label w-100"
+                                        :for="`meal-${meal.name}`"
+                                    >
+
+
+                                        <div
+                                            class="d-flex justify-content-between"
+                                        >
+
+                                            <strong>
+                                                {{ meal.name }}
+                                            </strong>
+
+
+                                            <span>
+                                                ₱{{
+                                                    meal.price.toLocaleString()
+                                                }}
+                                            </span>
+
+                                        </div>
+
+
+                                        <small class="text-muted">
+                                            {{ meal.description }}
+                                        </small>
+
+
+                                    </label>
+
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ========================================
+                 ADD-ONS
+            ======================================== -->
+
+            <div class="mb-4">
+
+
+                <h4 class="mb-3">
+                    Add-ons
+                </h4>
+
+
+                <p class="text-muted">
+                    Select as many add-ons as you want.
+                </p>
+
+
+                <div class="row g-3">
+
+
+                    <div
+                        v-for="addOn in addOns"
+                        :key="addOn.name"
+                        class="col-md-6"
+                    >
+
+                        <div class="card h-100">
+
+                            <div class="card-body">
+
+                                <div class="form-check">
+
+
+                                    <input
+                                        class="form-check-input"
+                                        type="checkbox"
+                                        :id="`addon-${addOn.name}`"
+                                        :value="addOn.name"
+                                        v-model="selectedAddOns"
+                                    >
+
+
+                                    <label
+                                        class="form-check-label w-100"
+                                        :for="`addon-${addOn.name}`"
+                                    >
+
+
+                                        <div
+                                            class="d-flex justify-content-between"
+                                        >
+
+                                            <strong>
+                                                {{ addOn.name }}
+                                            </strong>
+
+
+                                            <span>
+                                                ₱{{
+                                                    addOn.price.toLocaleString()
+                                                }}
+                                            </span>
+
+                                        </div>
+
+
+                                        <small class="text-muted">
+                                            {{ addOn.description }}
+                                        </small>
+
+
+                                    </label>
+
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ========================================
+                 BOOKING SUMMARY
+            ======================================== -->
+
+            <div class="card">
+
+
+                <div class="card-body">
+
+
+                    <h4 class="mb-4">
+                        Booking Summary
+                    </h4>
+
+
+                    <!-- FLIGHT -->
+
+                    <div
+                        class="d-flex justify-content-between mb-2"
+                    >
+
+                        <span>
+                            Flight
+                        </span>
+
+
+                        <strong>
+                            ₱{{ flightPrice.toLocaleString() }}
+                        </strong>
+
+                    </div>
+
+
+                    <!-- MEALS -->
+
+                    <div class="mb-3">
+
+
+                        <strong>
+                            Meals
+                        </strong>
+
+
+                        <div
+                            v-for="mealName in selectedMeals"
+                            :key="mealName"
+                            class="d-flex justify-content-between mt-2"
+                        >
+
+                            <span>
+                                {{ mealName }}
+                            </span>
+
+
+                            <span>
+
+                                ₱{{
+                                    (
+                                        meals.find(
+                                            meal =>
+                                                meal.name === mealName
+                                        )?.price || 0
+                                    ).toLocaleString()
+                                }}
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- MEALS TOTAL -->
+
+                    <div
+                        class="d-flex justify-content-between mb-2"
+                    >
+
+                        <span>
+                            Meals Total
+                        </span>
+
+
+                        <span>
+                            ₱{{ mealsTotal.toLocaleString() }}
+                        </span>
+
+                    </div>
+
+
+                    <!-- ADD-ONS -->
+
+                    <div
+                        v-if="selectedAddOns.length > 0"
+                        class="mb-3"
+                    >
+
+
+                        <strong>
+                            Add-ons
+                        </strong>
+
+
+                        <div
+                            v-for="addOnName in selectedAddOns"
+                            :key="addOnName"
+                            class="d-flex justify-content-between mt-2"
+                        >
+
+                            <span>
+                                {{ addOnName }}
+                            </span>
+
+
+                            <span>
+
+                                ₱{{
+                                    (
+                                        addOns.find(
+                                            addOn =>
+                                                addOn.name === addOnName
+                                        )?.price || 0
+                                    ).toLocaleString()
+                                }}
+
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- ADD-ONS TOTAL -->
+
+                    <div
+                        class="d-flex justify-content-between mb-2"
+                    >
+
+                        <span>
+                            Add-ons Total
+                        </span>
+
+
+                        <span>
+                            ₱{{ addOnsTotal.toLocaleString() }}
+                        </span>
+
+                    </div>
+
+
+                    <!-- TAX -->
+
+                    <div
+                        class="d-flex justify-content-between mb-3"
+                    >
+
+                        <span>
+                            Tax
+                        </span>
+
+
+                        <span>
+                            ₱{{ tax.toLocaleString() }}
+                        </span>
+
+                    </div>
+
+
+                    <hr>
+
+
+                    <!-- TOTAL -->
+
+                    <div
+                        class="d-flex justify-content-between"
+                    >
+
+                        <strong class="fs-5">
+                            Total
+                        </strong>
+
+
+                        <strong class="fs-5">
+                            ₱{{ totalPrice.toLocaleString() }}
+                        </strong>
+
+                    </div>
+
+
+                </div>
+
+            </div>
+
+
+            <!-- ========================================
+                 BUTTONS
+            ======================================== -->
+
+            <hr class="my-4">
+
+
+            <div
+                class="mt-4 d-flex justify-content-between"
+            >
+
+
+                <!-- BACK -->
+
+                <button
+                    class="btn btn-secondary"
+                    @click="goBack"
+                    :disabled="bookingStore.loading"
+                >
+
+                    Back
+
+                </button>
+
+
+                <!-- CONFIRM -->
+
+                <button
+                    class="btn btn-success"
+                    :disabled="bookingStore.loading"
+                    @click="confirmBooking"
+                >
+
+
+                    <span
+                        v-if="bookingStore.loading"
+                    >
+                        Processing...
+                    </span>
+
+
+                    <span v-else>
+                        Confirm Booking
+                    </span>
+
+
+                </button>
+
+
+            </div>
+
+
         </div>
+
     </div>
+
+
+    <!-- ========================================
+         ERROR
+    ======================================== -->
+
+    <div
+        v-else
+        class="alert alert-danger"
+    >
+
+        {{ errorMessage || "Flight information unavailable." }}
+
+    </div>
+
 
 </div>
 

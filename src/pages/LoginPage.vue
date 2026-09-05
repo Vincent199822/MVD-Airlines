@@ -5,26 +5,29 @@ import { useRouter } from "vue-router";
 import { useUserStore } from "../stores/user";
 
 const router = useRouter();
-
 const store = useUserStore();
 
 const email = ref("");
-
 const password = ref("");
 
-function login(){
+async function login() {
 
-const success = store.login(
-	email.value,
-	password.value
-	);
+    if (!email.value || !password.value) {
+        alert("Please enter your email and password.");
+        return;
+    }
 
-	if(success){
-		alert("Welcome!");
-		router.push("/");
-	}else{
-		alert("Invalid Credentials");
-	}
+    const result = await store.login(
+        email.value,
+        password.value
+    );
+
+    if (result.success) {
+        alert("Welcome!");
+        router.push("/");
+    } else {
+        alert(result.message);
+    }
 }
 
 </script>

@@ -1,10 +1,10 @@
 <script setup>
+import api from "../api/axios";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useUserStore } from "../stores/user";
 
 const router = useRouter();
-const store = useUserStore();
 
 const firstName = ref("");
 const lastName = ref("");
@@ -13,8 +13,7 @@ const mobileNo = ref("");
 const password = ref("");
 const confirmPassword = ref("");
 
-function register() {
-
+async function register() {
     if (
         !firstName.value ||
         !lastName.value ||
@@ -37,17 +36,27 @@ function register() {
         return;
     }
 
-    store.register({
-        firstName: firstName.value,
-        lastName: lastName.value,
-        email: email.value,
-        mobileNo: mobileNo.value,
-        password: password.value
-    });
+    try {
+        const response = await api.post("/users/register", {
+            firstName: firstName.value,
+            lastName: lastName.value,
+            email: email.value,
+            password: password.value,
+            confirmPassword: confirmPassword.value
+        });
 
-    alert("Registration Successful!");
+        alert(response.data.message);
 
-    router.push("/login");
+        router.push("/login");
+
+    } catch (error) {
+        console.error("Registration error:", error);
+
+        alert(
+            error.response?.data?.message ||
+            "Registration failed. Please try again."
+        );
+    }
 }
 </script>
 

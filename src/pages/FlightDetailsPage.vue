@@ -1,105 +1,300 @@
 <script setup>
-import { computed } from "vue";
+import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { useFlightStore } from "../stores/flightStore";
 
 const route = useRoute();
-
 const flightStore = useFlightStore();
 
-const flight = computed(() => {
+const flight = ref(null);
+const loading = ref(true);
+const errorMessage = ref("");
 
-    return flightStore.getFlightById(route.params.id);
+onMounted(async () => {
 
+    const result = await flightStore.getFlightById(
+        route.params.id
+    );
+
+    if (result.success) {
+        flight.value = result.flight;
+    } else {
+        errorMessage.value = result.message;
+    }
+
+    loading.value = false;
 });
 </script>
 
 <template>
-	<div class="container py-4">
-		<div
-		v-if="flight"
-		class="card shadow-lg">
-		<div class="card-header bg-primary text-white">
-			<h2>
-			✈ Flight Details
-			</h2>
-		</div>
 
-			<div class="card-body">
-				<h3>
-				{{ flight.airline }}
-				</h3>
-				<hr>
-				<div class="row">
-					<div class="col-md-6">
-						<p>
-						<strong>Flight Number:</strong>{{ flight.flightNumber }}
-						</p>
+<div class="container py-4">
 
-						<p>
-						<strong>From:</strong>{{ flight.from }}
-						</p>
+    <!-- Loading -->
+    <div
+        v-if="loading"
+        class="text-center py-5"
+    >
+        <div class="spinner-border text-primary"></div>
 
-						<p>
-						<strong>To:</strong>{{ flight.to }}
-						</p>
+        <p class="mt-3 mb-0">
+            Loading flight details...
+        </p>
+    </div>
 
-						<p>
-						<strong>Date:</strong>{{ flight.departure }}
-						</p>
 
-						<p>
-						<strong>Departure:</strong>{{ flight.departureTime }}
-						</p>
-					</div>
+    <!-- Error -->
+    <div
+        v-else-if="errorMessage"
+        class="alert alert-danger"
+    >
+        {{ errorMessage }}
+    </div>
 
-				<div class="col-md-6">
-					<p>
-					<strong>Arrival:</strong>{{ flight.arrivalTime }}
-					</p>
 
-					<p>
-					<strong>Duration:</strong>{{ flight.duration }}
-					</p>
+    <!-- Flight Details -->
+    <div
+        v-else-if="flight"
+        class="card shadow-lg"
+    >
 
-					<p>
-					<strong>Aircraft:</strong>{{ flight.aircraft }}
-					</p>
+        <!-- Header -->
+        <div class="card-header bg-primary text-white">
 
-					<p>
-					<strong>Cabin:</strong>{{ flight.cabin }}
-					</p>
+            <h2 class="mb-1">
+                Flight Details
+            </h2>
 
-					<p>
-					<strong>Seats Left:</strong>{{ flight.availableSeats }}
-					</p>
-				</div>
-			</div>
-				<hr>
+            <small>
+                {{ flight.flightNumber }}
+            </small>
 
-				<h4 class="text-success">
-				₱ {{ flight.price.toLocaleString() }}
-				</h4>
-				<div class="mt-4">
-					<router-link
-						class="btn btn-secondary me-2"
-						to="/search-flights">
-						Back
-					</router-link>
+        </div>
 
-					<router-link
-						class="btn btn-success"
-						:to="'/book-flight/' + flight.id">
-						Book Flight
-					</router-link>
-				</div>
-			</div>
-		</div>
-		<div
-			v-else
-			class="alert alert-danger">
 
-			Flight not found.
-		</div>
-	</div>
+        <div class="card-body">
+
+            <!-- Flight Number + Status -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+
+                <div>
+                    <h3 class="fw-bold mb-1">
+                        {{ flight.flightNumber }}
+                    </h3>
+
+                    <small class="text-muted">
+                        Flight Information
+                    </small>
+                </div>
+
+
+                <span
+                    v-if="flight.status === 'scheduled'"
+                    class="badge bg-success text-capitalize"
+                >
+                    {{ flight.status }}
+                </span>
+
+                <span
+                    v-else
+                    class="badge bg-danger text-capitalize"
+                >
+                    {{ flight.status }}
+                </span>
+
+            </div>
+
+
+            <hr>
+
+
+            <!-- Route -->
+            <div class="text-center py-3">
+
+                <small class="text-muted">
+                    ROUTE
+                </small>
+
+                <h3 class="fw-bold mt-2">
+                    {{ flight.origin }}
+                    <span class="mx-3 text-muted">→</span>
+                    {{ flight.destination }}
+                </h3>
+
+            </div>
+
+
+            <hr>
+
+
+            <!-- Flight Schedule -->
+            <div class="row g-4">
+
+                <!-- Departure -->
+                <div class="col-md-6">
+
+                    <div class="border rounded p-3 h-100">
+
+                        <h5 class="fw-bold mb-3">
+                            Departure
+                        </h5>
+
+                        <p class="mb-2">
+                            <strong>From:</strong>
+                            {{ flight.origin }}
+                        </p>
+
+                        <p class="mb-0">
+                            <strong>Date & Time:</strong><br>
+
+                            {{ new Date(
+                                flight.departureDate
+                            ).toLocaleString() }}
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Arrival -->
+                <div class="col-md-6">
+
+                    <div class="border rounded p-3 h-100">
+
+                        <h5 class="fw-bold mb-3">
+                            Arrival
+                        </h5>
+
+                        <p class="mb-2">
+                            <strong>To:</strong>
+                            {{ flight.destination }}
+                        </p>
+
+                        <p class="mb-0">
+                            <strong>Date & Time:</strong><br>
+
+                            {{ new Date(
+                                flight.arrivalDate
+                            ).toLocaleString() }}
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <hr class="my-4">
+
+
+            <!-- Flight Availability -->
+            <div class="row g-3">
+
+                <!-- Available Seats -->
+                <div class="col-md-6">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            AVAILABLE SEATS
+                        </small>
+
+                        <h4 class="fw-bold mt-1 mb-0">
+                            {{ flight.availableSeats }}
+                        </h4>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Status -->
+                <div class="col-md-6">
+
+                    <div class="border rounded p-3">
+
+                        <small class="text-muted">
+                            FLIGHT STATUS
+                        </small>
+
+                        <h4 class="fw-bold mt-1 mb-0 text-capitalize">
+                            {{ flight.status }}
+                        </h4>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <hr class="my-4">
+
+
+            <!-- Price -->
+            <div class="d-flex justify-content-between align-items-center">
+
+                <div>
+                    <small class="text-muted">
+                        FLIGHT PRICE
+                    </small>
+
+                    <h3 class="text-success fw-bold mb-0">
+                        ₱{{ flight.price.toLocaleString() }}
+                    </h3>
+                </div>
+
+
+                <div class="text-end">
+
+                    <small class="text-muted">
+                        PER PASSENGER
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <!-- Buttons -->
+            <div class="mt-4 d-flex justify-content-between">
+
+                <router-link
+                    class="btn btn-secondary"
+                    to="/search-flights"
+                >
+                    Back
+                </router-link>
+
+
+                <router-link
+                    v-if="
+                        flight.status === 'scheduled' &&
+                        flight.availableSeats > 0
+                    "
+                    class="btn btn-success"
+                    :to="'/book-flight/' + flight._id"
+                >
+                    Book Flight
+                </router-link>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Flight Not Found -->
+    <div
+        v-else
+        class="alert alert-danger"
+    >
+        Flight not found.
+    </div>
+
+</div>
+
 </template>

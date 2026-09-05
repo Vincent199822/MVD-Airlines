@@ -1,211 +1,232 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import api from "../api/axios";
 
 export const useFlightStore = defineStore("flight", () => {
 
 
-    const defaultFlights = [
-        {
-            id: 1,
-            airline: "Philippine Airlines",
-            flightNumber: "PR103",
-            from: "Manila",
-            to: "Tokyo",
-            departure: "2026-08-20",
-            departureTime: "08:00 AM",
-            arrivalTime: "01:30 PM",
-            duration: "4h 30m",
-            aircraft: "Airbus A321",
-            price: 15500,
-            availableSeats: 25,
-            cabin: "Economy",
-            image: "/src/assets/images/tokyo.jpg",
+const flights = ref([]);
+const loading = ref(false);
+const error = ref(null);
 
-	        seats: [
-		        "A1","A2","A3","A4",
-		        "B1","B2","B3","B4",
-		        "C1","C2","C3","C4",
-		        "D1","D2","D3","D4"
-		    ],
+// Get all flights from backend
+async function fetchFlights() {
+    loading.value = true;
+    error.value = null;
 
-		    reservedSeats: [
-		        "B2",
-		        "C4",
-		        "D1"
-		    ]
-        },
-        {
-            id: 2,
-            airline: "Cebu Pacific",
-            flightNumber: "5J812",
-            from: "Manila",
-            to: "Singapore",
-            departure: "2026-08-21",
-            departureTime: "09:45 AM",
-            arrivalTime: "01:15 PM",
-            duration: "3h 30m",
-            aircraft: "Airbus A320",
-            price: 7800,
-            availableSeats: 42,
-            cabin: "Economy",
-                        image: "/src/assets/images/tokyo.jpg",
+    try {
+        const response = await api.get("/flights");
 
-	        seats: [
-		        "A1","A2","A3","A4",
-		        "B1","B2","B3","B4",
-		        "C1","C2","C3","C4",
-		        "D1","D2","D3","D4"
-		    ],
+        flights.value = response.data.flights;
 
-		    reservedSeats: [
-		        "B2",
-		        "C4",
-		        "D1"
-		    ]
-        },
-        {
-            id: 3,
-            airline: "AirAsia",
-            flightNumber: "Z2890",
-            from: "Manila",
-            to: "Seoul",
-            departure: "2026-08-22",
-            departureTime: "10:30 AM",
-            arrivalTime: "03:45 PM",
-            duration: "5h 15m",
-            aircraft: "Airbus A320",
-            price: 9800,
-            availableSeats: 18,
-            cabin: "Economy",
-                        image: "/src/assets/images/tokyo.jpg",
+        return {
+            success: true,
+            flights: flights.value
+        };
 
-	        seats: [
-		        "A1","A2","A3","A4",
-		        "B1","B2","B3","B4",
-		        "C1","C2","C3","C4",
-		        "D1","D2","D3","D4"
-		    ],
+    } catch (err) {
+        console.error("Get flights error:", err);
 
-		    reservedSeats: [
-		        "B2",
-		        "C4",
-		        "D1"
-		    ]
-        },
-        {
-            id: 4,
-            airline: "Singapore Airlines",
-            flightNumber: "SQ915",
-            from: "Manila",
-            to: "Singapore",
-            departure: "2026-08-23",
-            departureTime: "02:00 PM",
-            arrivalTime: "05:35 PM",
-            duration: "3h 35m",
-            aircraft: "Boeing 787",
-            price: 18500,
-            availableSeats: 15,
-            cabin: "Business",
-                        image: "/src/assets/images/tokyo.jpg",
+        error.value =
+            err.response?.data?.message ||
+            "Failed to load flights.";
 
-	        seats: [
-		        "A1","A2","A3","A4",
-		        "B1","B2","B3","B4",
-		        "C1","C2","C3","C4",
-		        "D1","D2","D3","D4"
-		    ],
+        return {
+            success: false,
+            message: error.value
+        };
 
-		    reservedSeats: [
-		        "B2",
-		        "C4",
-		        "D1"
-		    ]
+    } finally {
+        loading.value = false;
+    }
+}
+
+// Create Flight - Admin
+async function createFlight(flightData) {
+
+    try {
+
+        const token = localStorage.getItem("token");
+
+        const response = await api.post(
+            "/flights",
+            flightData,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        // Add the newly created flight to the list
+        flights.value.push(response.data.flight);
+
+        return {
+            success: true,
+            flight: response.data.flight,
+            message: response.data.message
+        };
+
+    } catch (err) {
+
+        console.error("Create flight error:", err);
+
+        return {
+            success: false,
+            message:
+                err.response?.data?.message ||
+                "Failed to create flight."
+        };
+    }
+}
+
+// Update Flight - Admin
+async function updateFlight(id, flightData) {
+
+    try {
+
+        const token = localStorage.getItem("token");
+
+        const response = await api.put(
+            `/flights/${id}`,
+            flightData,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+
+        // Find the updated flight in the store
+        const index = flights.value.findIndex(
+            flight => flight._id === id
+        );
+
+        // Replace it with the updated flight
+        if (index !== -1) {
+            flights.value[index] = response.data.flight;
         }
-    ];
 
-    const flights = ref(
-    loadFlights()
-);
+        return {
+            success: true,
+            flight: response.data.flight,
+            message: response.data.message
+        };
 
-    function loadFlights() {
-        const savedFlights = localStorage.getItem("flights");
-        if (savedFlights) {
-            return JSON.parse(savedFlights);
-        }
-    return structuredClone(defaultFlights);
+    } catch (err) {
 
+        console.error("Update flight error:", err);
+
+        return {
+            success: false,
+            message:
+                err.response?.data?.message ||
+                "Failed to update flight."
+        };
     }
+}
 
-    function saveFlights(flights) {
-        localStorage.setItem(
-            "flights",
-            JSON.stringify(flights)
+// Delete Flight - Admin
+async function deleteFlight(id) {
+
+    try {
+
+        const token = localStorage.getItem("token");
+
+        const response = await api.delete(
+            `/flights/${id}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
         );
-    }
 
-    function getFlightById(id) {
-        return flights.value.find(
-            flight => flight.id === Number(id)
+        // Remove the deleted flight from the store
+        flights.value = flights.value.filter(
+            flight => flight._id !== id
         );
-    }
 
-    function searchFlights(filters) {
-        return flights.value.filter((flight) => {
-            const matchFrom =
-                !filters.from ||
-                flight.from === filters.from;
-            const matchTo =
-                !filters.to ||
-                flight.to === filters.to;
-            const matchDate =
-                !filters.departure ||
-                flight.departure === filters.departure;
-            return (
-                matchFrom &&
-                matchTo &&
-                matchDate
-            );
-        });
-    }
+        return {
+            success: true,
+            message: response.data.message
+        };
 
-    function reserveSeat(flightId, seat) {
-        const flight = flights.value.find(
-            flight => flight.id === flightId
+    } catch (err) {
+
+        console.error("Delete flight error:", err);
+
+        return {
+            success: false,
+            message:
+                err.response?.data?.message ||
+                "Failed to delete flight."
+        };
+    }
+}
+
+// 
+// Get one flight from backend
+async function getFlightById(id) {
+
+    try {
+        const response = await api.get(`/flights/${id}`);
+
+        return {
+            success: true,
+            flight: response.data.flight
+        };
+
+    } catch (err) {
+        console.error("Get flight error:", err);
+
+        return {
+            success: false,
+            message:
+                err.response?.data?.message ||
+                "Failed to load flight."
+        };
+    }
+}
+
+
+// Search flights
+function searchFlights(filters) {
+
+    return flights.value.filter((flight) => {
+
+        const matchFrom =
+            !filters.from ||
+            flight.origin === filters.from;
+
+        const matchTo =
+            !filters.to ||
+            flight.destination === filters.to;
+
+        const matchDate =
+            !filters.departure ||
+            flight.departureDate?.slice(0, 10) === filters.departure;
+
+        return (
+            matchFrom &&
+            matchTo &&
+            matchDate
         );
-        if (!flight) return;
-        if (!flight.reservedSeats.includes(seat)) {
-            flight.reservedSeats.push(seat);
-                saveFlights(flights.value);
-            localStorage.setItem(
-                "flights",
-                JSON.stringify(flights.value)
-            );
-        }
-    }
+    });
+}
 
-    function releaseSeat(flightId, seat) {
-    const flight = flights.value.find(
-        flight => flight.id === flightId
-    );
-    if (!flight) return;
-        flight.reservedSeats = flight.reservedSeats.filter(
-            reservedSeat => reservedSeat !== seat
-        );
-        saveFlights(flights.value);
-    }
 
-    function resetFlights() {
-        flights.value = structuredClone(defaultFlights);
-        saveFlights(flights.value);
-    }
+return {
+    flights,
+    loading,
+    error,
+    fetchFlights,
+    createFlight,
+    updateFlight,
+    deleteFlight,
+    getFlightById,
+    searchFlights
+};
 
-    return {
-        flights,
-        getFlightById,
-        searchFlights,
-        reserveSeat,
-        releaseSeat,
-        resetFlights
-    };
 
 });

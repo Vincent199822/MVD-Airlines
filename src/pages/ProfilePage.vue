@@ -1,167 +1,263 @@
+
 <script setup>
 
+import { onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useUserStore } from "../stores/user";
-import { computed } from "vue";
 import { useBookingStore } from "../stores/bookingStore";
 
 const router = useRouter();
-const store = useUserStore();
+
 const userStore = useUserStore();
 const bookingStore = useBookingStore();
 
-const myBookings = computed(() => {
-    if (!userStore.currentUser) return [];
-
-    return bookingStore.bookings.filter(
-        booking => booking.email === userStore.currentUser.email
-    );
+// Load user profile from backend
+onMounted(async () => {
+    await userStore.fetchProfile();
 });
 
-//Total bookings
+// User bookings
+const myBookings = computed(() => {
+    return bookingStore.bookings;
+});
+
+// Total bookings
 const totalBookings = computed(() => {
     return myBookings.value.length;
 });
 
-//Upcoming bookings
+// Upcoming bookings
 const upcomingBookings = computed(() => {
-    return myBookings.value.length;
+    return myBookings.value.filter(
+        booking =>
+            booking.status === "confirmed" &&
+            booking.flight &&
+            new Date(booking.flight.departureDate) > new Date()
+    ).length;
 });
 
-//Cancelled booking
-const cancelledBookings = computed(() =>
-    myBookings.value.filter(
-        booking => booking.status === "Cancelled"
-    ).length
-);
+// Cancelled bookings
+const cancelledBookings = computed(() => {
+    return myBookings.value.filter(
+        booking => booking.status === "cancelled"
+    ).length;
+});
 
-function logout(){
-	store.logout();
-	router.push("/");
+function logout() {
+    userStore.logout();
+    router.push("/");
 }
-
-
 
 </script>
 
 <template>
 
 <div class="container py-5">
-    <div class="row justify-content-center">
+
+    <div
+        v-if="userStore.currentUser"
+        class="row justify-content-center"
+    >
+
         <div class="col-lg-6">
+
             <div class="card shadow-lg">
+
                 <div class="card-body p-5">
 
-    <!-- Profile Content -->
-    				<div class="text-center">
-					    <i
-					        class="bi bi-person-circle text-primary"
-					        style="font-size:100px"
-					    ></i>
+                    <!-- Profile Content -->
 
-					    <h2 class="fw-bold mt-3">
-					        {{ userStore.currentUser.firstName }}
-					        {{ userStore.currentUser.lastName }}
-					    </h2>
+                    <div class="text-center">
 
-					    <p class="text-muted">
-					        Airline Passenger
-					    </p>
+                        <i
+                            class="bi bi-person-circle text-primary"
+                            style="font-size:100px"
+                        ></i>
 
-					    <span class="badge bg-success">
-					        Active Member
-					    </span>
-					</div>
+                        <h2 class="fw-bold mt-3">
 
-					<ul class="list-group list-group-flush mt-5">
-					    <li class="list-group-item d-flex justify-content-between">
-					        <strong>
-					            <i class="bi bi-envelope-fill text-primary me-2"></i>
-					            Email
-					        </strong>
+                            {{ userStore.currentUser.firstName }}
 
-					        <span>
-					            {{ userStore.currentUser.email }}
-					        </span>
-					    </li>
+                            {{ userStore.currentUser.lastName }}
 
-					    <li class="list-group-item d-flex justify-content-between">
-					        <strong>
-					            <i class="bi bi-phone-fill text-primary me-2"></i>
-					            Mobile
-					        </strong>
-					        <span>
-					            {{ userStore.currentUser.mobileNo }}
-					        </span>
-					    </li>
-					</ul>
+                        </h2>
 
-					<div class="row text-center mt-5">
-					    <div class="col">
-					        <div class="card bg-light">
-					            <div class="card-body">
-					             <h3>{{ totalBookings }}</h3>
-					                <small>
-					                    Bookings
-					                </small>
-					            </div>
-					        </div>
-					    </div>
+                        <p class="text-muted">
+                            Airline Passenger
+                        </p>
 
-					    <div class="col">
-					        <div class="card bg-light">
-					            <div class="card-body">
-							<h3>{{ upcomingBookings }}</h3>
-					                <small>
-					                    Upcoming
-					                </small>
-					            </div>
-					        </div>
-					    </div>
+                        <span class="badge bg-success">
+                            Active Member
+                        </span>
 
-					    <div class="col">
-					        <div class="card bg-light">
-					            <div class="card-body">
-							<h3>{{ cancelledBookings }}</h3>
-					                <small>
-					                    Cancelled
-					                </small>
-					            </div>
-					        </div>
-					    </div>
-					</div>
+                    </div>
 
-					<div class="d-grid gap-3 mt-5">
-					    <router-link
-					        to="/search-flights"
-					        class="btn btn-primary rounded-pill"
-					    >
-					        <i class="bi bi-search me-2"></i>
-					        Search Flights
-					    </router-link>
 
-					    <router-link
-					        to="/booking-history"
-					        class="btn btn-outline-success rounded-pill"
-					    >
-					        <i class="bi bi-journal-text me-2"></i>
-					        My Bookings
-					    </router-link>
+                    <!-- User Information -->
 
-					    <button
-					        class="btn btn-outline-danger rounded-pill"
-					        @click="logout"
-					    >
-					        <i class="bi bi-box-arrow-right me-2"></i>
-					        Logout
-					    </button>
-					</div>
+                    <ul class="list-group list-group-flush mt-5">
 
+                        <li
+                            class="list-group-item d-flex justify-content-between"
+                        >
+
+                            <strong>
+
+                                <i
+                                    class="bi bi-envelope-fill text-primary me-2"
+                                ></i>
+
+                                Email
+
+                            </strong>
+
+                            <span>
+                                {{ userStore.currentUser.email }}
+                            </span>
+
+                        </li>
+
+                    </ul>
+
+
+                    <!-- Booking Statistics -->
+
+                    <div class="row text-center mt-5">
+
+                        <div class="col">
+
+                            <div class="card bg-light">
+
+                                <div class="card-body">
+
+                                    <h3>
+                                        {{ totalBookings }}
+                                    </h3>
+
+                                    <small>
+                                        Bookings
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="col">
+
+                            <div class="card bg-light">
+
+                                <div class="card-body">
+
+                                    <h3>
+                                        {{ upcomingBookings }}
+                                    </h3>
+
+                                    <small>
+                                        Upcoming
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="col">
+
+                            <div class="card bg-light">
+
+                                <div class="card-body">
+
+                                    <h3>
+                                        {{ cancelledBookings }}
+                                    </h3>
+
+                                    <small>
+                                        Cancelled
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <!-- Actions -->
+
+                    <div class="d-grid gap-3 mt-5">
+
+                        <router-link
+                            to="/search-flights"
+                            class="btn btn-primary rounded-pill"
+                        >
+
+                            <i class="bi bi-search me-2"></i>
+
+                            Search Flights
+
+                        </router-link>
+
+
+                        <router-link
+                            to="/booking-history"
+                            class="btn btn-outline-success rounded-pill"
+                        >
+
+                            <i class="bi bi-journal-text me-2"></i>
+
+                            My Bookings
+
+                        </router-link>
+
+
+                        <button
+                            class="btn btn-outline-danger rounded-pill"
+                            @click="logout"
+                        >
+
+                            <i class="bi bi-box-arrow-right me-2"></i>
+
+                            Logout
+
+                        </button>
+
+                    </div>
 
                 </div>
+
             </div>
+
         </div>
+
     </div>
+
+
+    <!-- Loading -->
+
+    <div
+        v-else
+        class="text-center py-5"
+    >
+
+        <div
+            class="spinner-border text-primary"
+            role="status"
+        ></div>
+
+        <p class="mt-3">
+            Loading profile...
+        </p>
+
+    </div>
+
 </div>
 
 </template>
+

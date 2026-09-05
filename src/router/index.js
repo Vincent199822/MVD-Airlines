@@ -10,6 +10,11 @@ import SearchFlightsPage from "../pages/SearchFlightsPage.vue";
 import FlightDetailsPage from "../pages/FlightDetailsPage.vue";
 import BookFlightPage from "../pages/BookFlightPage.vue";
 import BookingHistoryPage from "../pages/BookingHistoryPage.vue";
+import AdminDashboardPage from "../pages/AdminDashboardPage.vue";
+import AdminFlightsPage from "../pages/AdminFlightsPage.vue";
+import AdminMealsPage from "../pages/AdminMealsPage.vue";
+import AdminAddOnsPage from "../pages/AdminAddOnsPage.vue";
+import AdminBookingsPage from "../pages/AdminBookingsPage.vue";
 
 const routes = [
   {
@@ -64,6 +69,53 @@ const routes = [
       requiresAuth: true
     }
   },
+    {
+    path: "/admin",
+    name: "Admin Dashboard",
+    component: AdminDashboardPage,
+    meta: {
+        requiresAuth: true,
+        requiresAdmin: true
+    }
+  },
+  {
+  path: "/admin/flights",
+  name: "Admin Flights",
+  component: AdminFlightsPage,
+  meta: {
+    requiresAuth: true,
+    requiresAdmin: true
+  }
+  },
+  {
+    path: "/admin/meals",
+    name: "Admin Meals",
+    component: AdminMealsPage,
+    meta: {
+        requiresAuth: true,
+        requiresAdmin: true
+    }
+  },
+  {
+    path: "/admin/addons",
+    name: "Admin Add-ons",
+    component: AdminAddOnsPage,
+    meta: {
+        requiresAuth: true,
+        requiresAdmin: true
+    }
+  },
+  {
+    path: "/admin/bookings",
+    name: "Admin Bookings",
+    component: AdminBookingsPage,
+    meta: {
+        requiresAuth: true,
+        requiresAdmin: true
+    }
+},
+
+
 ];
 
 const router = createRouter({
@@ -72,13 +124,31 @@ const router = createRouter({
 });
 
 router.beforeEach((to) => {
+
     const userStore = useUserStore();
-    if(
+
+
+    // Authentication check
+    if (
         to.meta.requiresAuth &&
         !userStore.currentUser
-    ){
+    ) {
+
         return "/login";
+
     }
+
+
+    // Admin authorization check
+    if (
+        to.meta.requiresAdmin &&
+        userStore.currentUser?.role !== "admin"
+    ) {
+
+        return "/";
+
+    }
+
 });
 
 export default router;
