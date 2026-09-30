@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'https://blogapp-server-oa2l.onrender.com'
+    baseURL: 'https://mvd-airlines-backend.onrender.com/'
 });
 
 // USE THIS FOR TESTING LOCAL FOR UPGRADE
