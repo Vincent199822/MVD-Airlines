@@ -1,8 +1,13 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://localhost:4000'
+    baseURL: 'https://blogapp-server-oa2l.onrender.com'
 });
+
+// USE THIS FOR TESTING LOCAL FOR UPGRADE
+// const api = axios.create({
+//     baseURL: 'http://localhost:4000'
+// });
 
 // Automatically attach JWT token to requests
 api.interceptors.request.use(
